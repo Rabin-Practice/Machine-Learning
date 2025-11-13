@@ -1,17 +1,61 @@
 import pickle
+import warnings
 import streamlit as st
 from streamlit_option_menu import option_menu
 
-# loading the saved models
-diabetes_model = pickle.load(open('diabetes_model.sav', 'rb'))
-heart_disease_model = pickle.load(open('heart_disease_model.sav','rb'))
-parkinsons_model = pickle.load(open('parkinsons_model.sav', 'rb'))
-# sidebar for navigation
+# Suppress scikit-learn version mismatch warnings
+warnings.filterwarnings('ignore', category=UserWarning)
+warnings.filterwarnings('ignore', message='.*Trying to unpickle.*')
 
+# loading the saved models
+with open('diabetes_model.sav', 'rb') as f:
+    diabetes_model = pickle.load(f)
+with open('heart_disease_model.sav', 'rb') as f:
+    heart_disease_model = pickle.load(f)
+with open('parkinsons_model.sav', 'rb') as f:
+    parkinsons_model = pickle.load(f)
+
+# Default values (dataset means for non-critical features)
+DEFAULT_VALUES = {
+    'diabetes': {
+        'Pregnancies': 3.8,
+        'SkinThickness': 20.5,
+        'Insulin': 79.8,
+        'DiabetesPedigreeFunction': 0.47
+    },
+    'heart': {
+        'fbs': 0,  # Fasting blood sugar (0 or 1)
+        'restecg': 1,  # Resting ECG (0, 1, or 2)
+        'exang': 0,  # Exercise induced angina (0 or 1)
+        'oldpeak': 1.0,  # ST depression
+        'slope': 1,  # Slope (0, 1, or 2)
+        'ca': 0,  # Major vessels (0-3)
+        'thal': 2  # Thalassemia (0, 1, 2, or 3)
+    },
+    'parkinsons': {
+        'MDVP:Fhi(Hz)': 197.1,
+        'MDVP:Flo(Hz)': 116.3,
+        'MDVP:Jitter(Abs)': 0.00006,
+        'MDVP:RAP': 0.003,
+        'MDVP:PPQ': 0.0035,
+        'Jitter:DDP': 0.009,
+        'MDVP:Shimmer': 0.03,
+        'MDVP:Shimmer(dB)': 0.31,
+        'Shimmer:APQ3': 0.016,
+        'Shimmer:APQ5': 0.02,
+        'MDVP:APQ': 0.022,
+        'Shimmer:DDA': 0.048,
+        'NHR': 0.025,
+        'DFA': 0.82,
+        'spread1': -5.7,
+        'spread2': 0.23,
+        'D2': 2.38
+    }
+}
+
+# sidebar for navigation
 with st.sidebar:
-    
     selected = option_menu('Multiple Disease Prediction System',
-                          
                           ['Diabetes Prediction',
                            'Heart Disease Prediction',
                            'Parkinsons Prediction'],
@@ -19,124 +63,102 @@ with st.sidebar:
                           default_index=0)
     
 st.title("Multiple Disease Prediction System")
+st.markdown("---")
     
 # Diabetes Prediction Page
 if (selected == 'Diabetes Prediction'):
-    
-    # page title
     st.subheader('Diabetes Prediction')
+    st.markdown("Enter the following essential information:")
     
-    
-    # getting the input data from the user
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        Pregnancies = st.text_input('Number of Pregnancies')
-        
-    with col2:
-        Glucose = st.text_input('Glucose Level')
-    
-    with col3:
-        BloodPressure = st.text_input('Blood Pressure value')
+    col1, col2 = st.columns(2)
     
     with col1:
-        SkinThickness = st.text_input('Skin Thickness value')
+        Glucose = st.number_input('Glucose Level (mg/dL)', min_value=0, max_value=500, value=120, step=1)
+        BMI = st.number_input('BMI (Body Mass Index)', min_value=10.0, max_value=60.0, value=25.0, step=0.1)
     
     with col2:
-        Insulin = st.text_input('Insulin Level')
-    
-    with col3:
-        BMI = st.text_input('BMI value')
-    
-    with col1:
-        DiabetesPedigreeFunction = st.text_input('Diabetes Pedigree Function value')
-    
-    with col2:
-        Age = st.text_input('Age of the Person')
-    
+        BloodPressure = st.number_input('Blood Pressure (mmHg)', min_value=0, max_value=200, value=80, step=1)
+        Age = st.number_input('Age', min_value=0, max_value=120, value=30, step=1)
     
     # code for Prediction
     diab_diagnosis = ''
     
-    # creating a button for Prediction
-    
-    if st.button('Diabetes Test Result'):
-        diab_prediction = diabetes_model.predict([[Pregnancies, Glucose, BloodPressure, SkinThickness, Insulin, BMI, DiabetesPedigreeFunction, Age]])
+    if st.button('Get Diabetes Test Result', type='primary', use_container_width=True):
+        try:
+            # Use defaults for non-essential features
+            Pregnancies = DEFAULT_VALUES['diabetes']['Pregnancies']
+            SkinThickness = DEFAULT_VALUES['diabetes']['SkinThickness']
+            Insulin = DEFAULT_VALUES['diabetes']['Insulin']
+            DiabetesPedigreeFunction = DEFAULT_VALUES['diabetes']['DiabetesPedigreeFunction']
+            
+            # Make prediction with all features
+            diab_prediction = diabetes_model.predict([[Pregnancies, Glucose, BloodPressure, 
+                                                       SkinThickness, Insulin, BMI, 
+                                                       DiabetesPedigreeFunction, Age]])
+            
+            if (diab_prediction[0] == 1):
+                diab_diagnosis = '⚠️ The person is diabetic'
+            else:
+                diab_diagnosis = '✅ The person is not diabetic'
+        except Exception as e:
+            diab_diagnosis = f'Error: {str(e)}'
         
-        if (diab_prediction[0] == 1):
-          diab_diagnosis = 'The person is diabetic'
-        else:
-          diab_diagnosis = 'The person is not diabetic'
-        
-    st.success(diab_diagnosis)
+    if diab_diagnosis:
+        st.success(diab_diagnosis)
 
 
 
 
 # Heart Disease Prediction Page
 if (selected == 'Heart Disease Prediction'):
-    
-    # page title
     st.subheader('Heart Disease Prediction')
+    st.markdown("Enter the following essential information:")
     
-    col1, col2, col3 = st.columns(3)
+    col1, col2 = st.columns(2)
     
     with col1:
-        age = st.text_input('Age')
-        
+        age = st.number_input('Age', min_value=0, max_value=120, value=50, step=1)
+        sex = st.selectbox('Sex', options=[('Male', 1), ('Female', 0)], format_func=lambda x: x[0])
+        sex_value = sex[1]
+        cp = st.selectbox('Chest Pain Type', 
+                         options=[('Typical Angina', 0), ('Atypical Angina', 1), 
+                                 ('Non-anginal Pain', 2), ('Asymptomatic', 3)],
+                         format_func=lambda x: x[0])
+        cp_value = cp[1]
+    
     with col2:
-        sex = st.text_input('Sex')
-        
-    with col3:
-        cp = st.text_input('Chest Pain types')
-        
-    with col1:
-        trestbps = st.text_input('Resting Blood Pressure')
-        
-    with col2:
-        chol = st.text_input('Serum Cholestoral in mg/dl')
-        
-    with col3:
-        fbs = st.text_input('Fasting Blood Sugar > 120 mg/dl')
-        
-    with col1:
-        restecg = st.text_input('Resting Electrocardiographic results')
-        
-    with col2:
-        thalach = st.text_input('Maximum Heart Rate achieved')
-        
-    with col3:
-        exang = st.text_input('Exercise Induced Angina')
-        
-    with col1:
-        oldpeak = st.text_input('ST depression induced by exercise')
-        
-    with col2:
-        slope = st.text_input('Slope of the peak exercise ST segment')
-        
-    with col3:
-        ca = st.text_input('Major vessels colored by flourosopy')
-        
-    with col1:
-        thal = st.text_input('thal: 0 = normal; 1 = fixed defect; 2 = reversable defect')
-        
-        
-     
-     
+        trestbps = st.number_input('Resting Blood Pressure (mmHg)', min_value=0, max_value=250, value=130, step=1)
+        chol = st.number_input('Cholesterol Level (mg/dL)', min_value=0, max_value=600, value=240, step=1)
+        thalach = st.number_input('Maximum Heart Rate Achieved', min_value=0, max_value=250, value=150, step=1)
+    
     # code for Prediction
     heart_diagnosis = ''
     
-    # creating a button for Prediction
-    
-    if st.button('Heart Disease Test Result'):
-        heart_prediction = heart_disease_model.predict([[age, sex, cp, trestbps, chol, fbs, restecg,thalach,exang,oldpeak,slope,ca,thal]])                          
+    if st.button('Get Heart Disease Test Result', type='primary', use_container_width=True):
+        try:
+            # Use defaults for non-essential features
+            fbs = DEFAULT_VALUES['heart']['fbs']
+            restecg = DEFAULT_VALUES['heart']['restecg']
+            exang = DEFAULT_VALUES['heart']['exang']
+            oldpeak = DEFAULT_VALUES['heart']['oldpeak']
+            slope = DEFAULT_VALUES['heart']['slope']
+            ca = DEFAULT_VALUES['heart']['ca']
+            thal = DEFAULT_VALUES['heart']['thal']
+            
+            # Make prediction with all features
+            heart_prediction = heart_disease_model.predict([[age, sex_value, cp_value, trestbps, 
+                                                             chol, fbs, restecg, thalach,
+                                                             exang, oldpeak, slope, ca, thal]])                          
+            
+            if (heart_prediction[0] == 1):
+                heart_diagnosis = '⚠️ The person is having heart disease'
+            else:
+                heart_diagnosis = '✅ The person does not have any heart disease'
+        except Exception as e:
+            heart_diagnosis = f'Error: {str(e)}'
         
-        if (heart_prediction[0] == 1):
-          heart_diagnosis = 'The person is having heart disease'
-        else:
-          heart_diagnosis = 'The person does not have any heart disease'
-        
-    st.success(heart_diagnosis)
+    if heart_diagnosis:
+        st.success(heart_diagnosis)
         
     
     
@@ -144,92 +166,55 @@ if (selected == 'Heart Disease Prediction'):
 # Parkinson's Prediction Page
 if (selected == "Parkinsons Prediction"):
     
-    # page title
     st.subheader("Parkinson's Disease Prediction")
+    st.markdown("Enter the following essential voice analysis parameters:")
     
-    col1, col2, col3, col4, col5 = st.columns(5)  
+    col1, col2 = st.columns(2)
     
     with col1:
-        fo = st.text_input('MDVP:Fo(Hz)')
-        
-    with col2:
-        fhi = st.text_input('MDVP:Fhi(Hz)')
-        
-    with col3:
-        flo = st.text_input('MDVP:Flo(Hz)')
-        
-    with col4:
-        Jitter_percent = st.text_input('MDVP:Jitter(%)')
-        
-    with col5:
-        Jitter_Abs = st.text_input('MDVP:Jitter(Abs)')
-        
-    with col1:
-        RAP = st.text_input('MDVP:RAP')
-        
-    with col2:
-        PPQ = st.text_input('MDVP:PPQ')
-        
-    with col3:
-        DDP = st.text_input('Jitter:DDP')
-        
-    with col4:
-        Shimmer = st.text_input('MDVP:Shimmer')
-        
-    with col5:
-        Shimmer_dB = st.text_input('MDVP:Shimmer(dB)')
-        
-    with col1:
-        APQ3 = st.text_input('Shimmer:APQ3')
-        
-    with col2:
-        APQ5 = st.text_input('Shimmer:APQ5')
-        
-    with col3:
-        APQ = st.text_input('MDVP:APQ')
-        
-    with col4:
-        DDA = st.text_input('Shimmer:DDA')
-        
-    with col5:
-        NHR = st.text_input('NHR')
-        
-    with col1:
-        HNR = st.text_input('HNR')
-        
-    with col2:
-        RPDE = st.text_input('RPDE')
-        
-    with col3:
-        DFA = st.text_input('DFA')
-        
-    with col4:
-        spread1 = st.text_input('spread1')
-        
-    with col5:
-        spread2 = st.text_input('spread2')
-        
-    with col1:
-        D2 = st.text_input('D2')
-        
-    with col2:
-        PPE = st.text_input('PPE')
-        
+        fo = st.number_input('MDVP:Fo(Hz) - Average vocal fundamental frequency', 
+                            min_value=80.0, max_value=300.0, value=150.0, step=0.1)
+        Jitter_percent = st.number_input('MDVP:Jitter(%) - Variation in fundamental frequency', 
+                                        min_value=0.0, max_value=0.1, value=0.005, step=0.0001, format="%.4f")
+        HNR = st.number_input('HNR - Harmonics to Noise Ratio', 
+                             min_value=0.0, max_value=50.0, value=20.0, step=0.1)
     
+    with col2:
+        RPDE = st.number_input('RPDE - Nonlinear dynamical complexity measure', 
+                              min_value=0.0, max_value=1.0, value=0.4, step=0.01)
+        DFA = st.number_input('DFA - Signal fractal scaling exponent', 
+                             min_value=0.0, max_value=1.0, value=0.8, step=0.01)
+        PPE = st.number_input('PPE - Pitch period entropy', 
+                             min_value=0.0, max_value=1.0, value=0.1, step=0.01)
     
     # code for Prediction
     parkinsons_diagnosis = ''
     
-    # creating a button for Prediction    
-    if st.button("Parkinson's Test Result"):
-        parkinsons_prediction = parkinsons_model.predict([[fo, fhi, flo, Jitter_percent, Jitter_Abs, RAP, PPQ,DDP,Shimmer,Shimmer_dB,APQ3,APQ5,APQ,DDA,NHR,HNR,RPDE,DFA,spread1,spread2,D2,PPE]])                          
+    if st.button("Get Parkinson's Test Result", type='primary', use_container_width=True):
+        try:
+            # Use defaults for non-essential features
+            defaults = DEFAULT_VALUES['parkinsons']
+            
+            # Make prediction with all features
+            parkinsons_prediction = parkinsons_model.predict([[fo, defaults['MDVP:Fhi(Hz)'], defaults['MDVP:Flo(Hz)'], 
+                                                               Jitter_percent, defaults['MDVP:Jitter(Abs)'], 
+                                                               defaults['MDVP:RAP'], defaults['MDVP:PPQ'], 
+                                                               defaults['Jitter:DDP'], defaults['MDVP:Shimmer'], 
+                                                               defaults['MDVP:Shimmer(dB)'], defaults['Shimmer:APQ3'], 
+                                                               defaults['Shimmer:APQ5'], defaults['MDVP:APQ'], 
+                                                               defaults['Shimmer:DDA'], defaults['NHR'], HNR, RPDE,
+                                                               DFA, defaults['spread1'], defaults['spread2'], 
+                                                               defaults['D2'], PPE]])                          
+            
+            if (parkinsons_prediction[0] == 1):
+                parkinsons_diagnosis = "⚠️ The person has Parkinson's disease"
+            else:
+                parkinsons_diagnosis = "✅ The person does not have Parkinson's disease"
+        except Exception as e:
+            parkinsons_diagnosis = f'Error: {str(e)}'
         
-        if (parkinsons_prediction[0] == 1):
-          parkinsons_diagnosis = "The person has Parkinson's disease"
-        else:
-          parkinsons_diagnosis = "The person does not have Parkinson's disease"
-        
-    st.success(parkinsons_diagnosis)
+    if parkinsons_diagnosis:
+        st.success(parkinsons_diagnosis)
 
 def set_bg_from_url(url, opacity=1):
     
